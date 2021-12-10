@@ -25,9 +25,7 @@ function [m]=getComponentModeFor(rgbImg, blobPixels, component)
     components = (1:size(blobPixels, 1));
     i=1;
     for pixel = blobPixels
-        c = rgbImg(pixel(1));
-        pixel_rgb_val = c(pixel(2));
-        components(i) = pixel_rgb_val(component);
+        components(i) = rgbImg(pixel(2), pixel(1), component);
         i = i + 1;
     end
     m = mode(components);
