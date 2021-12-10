@@ -4,9 +4,14 @@ NN_FNAME = "nngrocery.mat";
 NN_DATA_FNAME = "nngrocerydata.csv";
 
 product_matrix = readmatrix(PRODUCT_MATRIX_FNAME);
+product_matrix_size = size(product_matrix);
 
-product_with_biggest_label = product_matrix(end);
-biggest_label = product_with_biggest_label(3);
+if product_matrix_size(1) == 0
+    biggest_label = 0;
+else
+   product_with_biggest_label = product_matrix(end);
+   biggest_label = product_with_biggest_label(3); 
+end
 
 product_matrix_new_products = [];
 
