@@ -1,32 +1,47 @@
-function [feature_vector]=extract_blob_features(blob_props, rgbImg)
-    feature_vector = (1:5);
+function [features]=extract_blob_features(blobs, rgbim, binim)
+    features = [];
     
-    %1st invariant moment of hu
-    img = blob_props.Image;
-    n20 = calculateNormalizedCentralMoment( 2, 0, img);
-    n02 = calculateNormalizedCentralMoment(0, 2, img);
-    feature_vector(1) = log_transform(n20 + n02);
-    
-    %2nd invariant moment of hu
-    n11 = calculateNormalizedCentralMoment(1, 1, img);
-    feature_vector(2) = log_transform(((n20 - n02) ^ 2) + 4*(n11^2));
-    
-    pxList = blob_props.PixelList;
-    feature_vector(3) = getComponentModeFor(rgbImg, pxList, 1);
-    feature_vector(4) = getComponentModeFor(rgbImg, pxList, 2);
-    feature_vector(5) = getComponentModeFor(rgbImg, pxList, 3);
+    for blob_props = blobs
+        area = blob_props.Area;
+        disp(area);
+        if area > 200
+            feature_vector = (1:5);
+            
+            blobim = blob_props.Image;
+            n20 = normalizedCentralMoment(2, 0, blobim);
+            n02 = normalizedCentralMoment(0, 2, blobim);
+            n11 = normalizedCentralMoment(1, 1, blobim);
+            
+            feature_vector(1) = n20 + n02;
+            feature_vector(2) = ((n20- n02) ^ 2) + (4 * (n11^2));
+            
+            feature_vector(1:2) = -sign(feature_vector(1:2)).*(log10(abs(feature_vector(1:2))));
+            
+            pxList = blob_props.BoundingBox;
+            feature_vector(3) = getComponentModeFor(rgbim,binim, pxList, 1);
+            feature_vector(4) = getComponentModeFor(rgbim,binim, pxList, 2);
+            feature_vector(5) = getComponentModeFor(rgbim,binim, pxList, 3);
+            
+            features = [features; feature_vector];
+        end
+    end
 end
 
-function [num]=log_transform(normalizedCentralMoment)
-    num = -1 * (1.0 * normalizedCentralMoment) * log10(abs(normalizedCentralMoment));
-end
+function [m]=getComponentModeFor(rgbim, binim, blobBoundingBox, component)
+    components = [];
+    i = 1;
 
-function [m]=getComponentModeFor(rgbImg, blobPixels, component)
-    components = (1:size(blobPixels, 1));
-    i=1;
-    for pixel = blobPixels
-        components(i) = rgbImg(pixel(2), pixel(1), component);
-        i = i + 1;
+    topLeftx = ceil(blobBoundingBox(1));
+    topLefty = ceil(blobBoundingBox(2));
+
+    for x = (topLeftx : ceil(topLeftx + blobBoundingBox(3)))
+        for y = (topLefty : ceil(topLefty + blobBoundingBox(4)))
+            %disp([y,x]);
+            if binim(y, x) == 1
+                components(i) = rgbim(y, x, component);
+                i = i + 1;
+            end
+        end
     end
     m = mode(components);
 end
@@ -40,11 +55,25 @@ function [moment]=calculateGeometricMoment(blobImg, xOrder, yOrder)
     end
 end
 
-function [normalized_central_moment]=calculateNormalizedCentralMoment(xOrder, yOrder, blobImg)
-    beta = ((xOrder + yOrder) / 2) + 1;
+function [moment]=centralMoment(blobImg, xOrder, yOrder)
+    moment = 0;
     
-    MxOrderyOrder = calculateGeometricMoment(blobImg, xOrder, yOrder);
-    M00 = calculateGeometricMoment(blobImg, 0, 0);
+    area = calculateGeometricMoment(blobImg, 0, 0);
+    xCenter = calculateGeometricMoment(blobImg, 1, 0) / area;
+    yCenter = calculateGeometricMoment(blobImg, 0, 1) / area;
     
-    normalized_central_moment = MxOrderyOrder / (M00 ^ beta);
+    for x = 1:size(blobImg, 1)
+        for y = 1:size(blobImg, 2)
+            moment = moment + ((x - xCenter) ^ xOrder) * ((y - yCenter) ^ yOrder) * blobImg(x,y);
+        end
+    end
+end
+
+function [normalized_central_moment]=normalizedCentralMoment(xOrder, yOrder, blobImg)
+    beta = ((xOrder + yOrder) / 2.0) + 1;
+    
+    uxOrderyOrder = centralMoment(blobImg, xOrder, yOrder);
+    u00 = centralMoment(blobImg, 0, 0);
+    
+    normalized_central_moment = uxOrderyOrder / (u00 ^ beta);
 end
