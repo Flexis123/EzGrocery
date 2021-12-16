@@ -1,17 +1,10 @@
-NN_DATA_SIZE = 15;
+NN_DATA_SIZE_PER_PRODUCT = 15;
 PRODUCT_MATRIX_FNAME = 'pmatrix.csv';
 NN_FNAME = 'nngrocery.mat';
 NN_DATA_FNAME = "nngrocerydata.csv";
 NN_FEATURES_AMOUNT = 5;
 
-product_matrix = readmatrix(PRODUCT_MATRIX_FNAME);
-product_matrix_size = size(product_matrix);
-
-if product_matrix_size(1) == 0
-    biggest_label = 0;
-else
-   biggest_label = product_matrix(end); 
-end
+[product_matrix,biggest_label] = read_product_matrix_and_biggest_label(PRODUCT_MATRIX_FNAME);
 
 product_matrix_new_products = [];
 
@@ -27,7 +20,7 @@ while want_to_register_new_product == 'y'
     disp(' ');
 end
 
-features_amount = size(product_matrix_new_products, 1) * NN_DATA_SIZE;
+features_amount = size(product_matrix_new_products, 1) * NN_DATA_SIZE_PER_PRODUCT;
 nn_features_new = zeros(features_amount, NN_FEATURES_AMOUNT);
 nn_labels_new = zeros(features_amount, 1);
 
@@ -40,7 +33,7 @@ disp(nn_features_new);
 disp(nn_labels_new);
 for i = (1: size(product_matrix_new_products, 1))
     disp(['starting nn data collection for label nr. : ', num2str(product_matrix_new_products(i, 2))]);
-    for f = (1: NN_DATA_SIZE)    
+    for f = (1: NN_DATA_SIZE_PER_PRODUCT)    
         features = [];
         
         picture_not_good = 1;
@@ -49,33 +42,14 @@ for i = (1: size(product_matrix_new_products, 1))
             while inp ~= 'c'
                 inp = input('Enter "c" character to take image snapshot', 's');
             end
-            
-            rgbim=getsnapshot(vid); 
-            
-            subplot(2, 1, 1);
-            imshow(rgbim);
-
-            %transform imgae to binary image using Otsu threshold method
-            im = rgb2gray(rgbim);
-            im = imbinarize(im);
-            im = imclose(im, strel('rectangle', [5, 6]));
-            
-            subplot(2, 1, 2);
-            imshow(im);
-
-            [labels,numlabels]=bwlabel(im);
-            props = regionprops(labels, 'all');
-
+   
+            [features, rgbim, im] = extract_blob_features(vid);
+        
             if size(features, 1) > 1
                 disp('second object detected! retake snapshot!');
                 continue;
-            end
-            
-            try
-                features = extract_blob_features(props, rgbim, im);
-                disp(features);
-            catch e
-                disp('Make sure the object is fully in frame!');
+            elseif size(features, 1) == 0
+                disp('no object detected!retake snapshot!');
                 continue;
             end
 
@@ -95,20 +69,11 @@ for i = (1: size(product_matrix_new_products, 1))
     end
 end
 
-nn_data = readmatrix(NN_DATA_FNAME);
-try
-    nn_features = nn_data(:, 1:5);
-    nn_labels = nn_data(:, 6);
-catch e
-    nn_features = [];
-    nn_labels = [];
-end
+[nn_features, nn_labels] = read_nn_data(NN_DATA_FNAME);
 
 nn_features =[nn_features; nn_features_new];
 nn_labels = [nn_labels; nn_labels_new];
-
 disp(nn_features);
-
 
 nn_labels_outputs = zeros(size(nn_labels, 1), biggest_label);
 for x = (1: size(nn_labels, 1))
@@ -120,7 +85,7 @@ end
 nngrocery = patternnet(30);
 nngrocery = train(nngrocery, nn_features', nn_labels_outputs');
 
-save nngrocery;
+save(NN_FNAME, 'nngrocery');
 writematrix([product_matrix; product_matrix_new_products], PRODUCT_MATRIX_FNAME);
 writematrix(merge_matrices(nn_features, nn_labels), NN_DATA_FNAME);
 

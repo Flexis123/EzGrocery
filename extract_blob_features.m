@@ -1,9 +1,28 @@
-function [features]=extract_blob_features(blobs, rgbim, binim)
+function [features, rgbim, binim]=extract_blob_features(video)
+    rgbim=getsnapshot(video); 
+            
+    subplot(2, 1, 1);
+    imshow(rgbim);
+
+    %transform imgae to binary image using Otsu threshold method
+    binim = rgb2gray(rgbim);
+    %imtool(binim);
+    %binim = imcrop(binim, []);
+    binim = imbinarize(binim);
+    binim = imclose(binim, strel('rectangle', [5, 6]));
+
+    subplot(2, 1, 2);
+    imshow(binim);
+
+    [labels,numlabels]=bwlabel(binim);
+    props = regionprops(labels, 'all');
+    
     features = [];
     
-    for blob_props = blobs
+    for i = (1: size(props, 1))
+        blob_props = props(i);
+        
         area = blob_props.Area;
-        disp(area);
         if area > 200
             feature_vector = (1:5);
             
@@ -17,28 +36,27 @@ function [features]=extract_blob_features(blobs, rgbim, binim)
             
             feature_vector(1:2) = -sign(feature_vector(1:2)).*(log10(abs(feature_vector(1:2))));
             
-            pxList = blob_props.BoundingBox;
-            feature_vector(3) = getComponentModeFor(rgbim,binim, pxList, 1);
-            feature_vector(4) = getComponentModeFor(rgbim,binim, pxList, 2);
-            feature_vector(5) = getComponentModeFor(rgbim,binim, pxList, 3);
+            feature_vector(3) = getComponentModeFor(rgbim,binim, blob_props, 1);
+            feature_vector(4) = getComponentModeFor(rgbim,binim, blob_props, 2);
+            feature_vector(5) = getComponentModeFor(rgbim,binim, blob_props, 3);
             
             features = [features; feature_vector];
         end
     end
 end
 
-function [m]=getComponentModeFor(rgbim, binim, blobBoundingBox, component)
+function [m]=getComponentModeFor(rgb, im, props, component)
+    bbox = props.BoundingBox;
+    binBoundingBox = imcrop(im, bbox);
+    rgbBoundingBox = imcrop(rgb, bbox);
+   
+    
     components = [];
     i = 1;
-
-    topLeftx = ceil(blobBoundingBox(1));
-    topLefty = ceil(blobBoundingBox(2));
-
-    for x = (topLeftx : ceil(topLeftx + blobBoundingBox(3)))
-        for y = (topLefty : ceil(topLefty + blobBoundingBox(4)))
-            %disp([y,x]);
-            if binim(y, x) == 1
-                components(i) = rgbim(y, x, component);
+    for x = (1:size(binBoundingBox, 1))
+        for y = (1:size(binBoundingBox, 2))
+            if binBoundingBox(x, y) == 1
+                components(i) = rgbBoundingBox(x, y, component);
                 i = i + 1;
             end
         end
